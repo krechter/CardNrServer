@@ -9,24 +9,29 @@
 
 
 
-function ReadCardNr() {
-  // Create WebSocket connection.
-    debugger;
-  const socket = new WebSocket("ws://localhost:8000/cardnr");
+	function ReadCardNr() {
+		// Create WebSocket connection.
+		debugger;
+		document.getElementById("CardNr").innerHTML = "Verbinde mit Cardreader...";
+		const socket = new WebSocket("ws://localhost:8000/cardnr");
 
-  // Connection opened
-  socket.addEventListener("open", (event) => {
-     socket.send("card number?"); 
-  });
+		// Connection opened
+		socket.addEventListener("open", (event) => {
+			socket.send("card number?");
+		});
 
-  // Listen for messages
-  socket.addEventListener("message", (event) => {
-    console.log("CodeNr from server=", event.data);
-    document.getElementById("CardNr").innerHTML = event.data;
-  });
-}
+		// Listen for messages
+		socket.addEventListener("message", (event) => {
+			console.log("CodeNr from server=", event.data);
+			document.getElementById("CardNr").innerHTML = event.data;
+		});
 
-  
+		socket.addEventListener("error", (event) => {
+			debugger
+			console.log("CodeNr from server=Verbindungsfehler", event.data);
+			document.getElementById("CardNr").innerHTML = "Verbindungsfehler";
+		});
+	}  
 </script>
 </head>
 <body>
