@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>CodeNr-Test</title>
+
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<script>
+
+
+
+function ReadCardNr() {
+  // Create WebSocket connection.
+  const socket = new WebSocket("ws://localhost:8000/cardnr");
+
+  // Connection opened
+  socket.addEventListener("open", (event) => {
+     socket.send("card number?"); 
+  });
+
+  // Listen for messages
+  socket.addEventListener("message", (event) => {
+    console.log("CodeNr from server=", event.data);
+    document.getElementById("CardNr").innerHTML = event.data;
+  });
+}
+
+  
+</script>
+</head>
+<body>
+
+<h1>test websocket 127.0.0.1:8000/codenr</h1>
+<button type="button" onclick="ReadCardNr()">Start</button>
+CardNr=<div id="CardNr"></div>
+
+</body>
+
+<script>
+
+</script>
+</html>
