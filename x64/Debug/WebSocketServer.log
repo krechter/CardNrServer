@@ -1,8 +1,2 @@
 ﻿  WebSocketServer.cpp
-C:\Users\krechter\git\CardNrServer\WebSocketServer.cpp(58,10): warning C4477: "printf": Die Formatzeichenfolge "%d" erfordert ein Argument vom Typ "int", das variadic-Argument "1" weist aber den Typ "size_t" auf.
-C:\Users\krechter\git\CardNrServer\WebSocketServer.cpp(58,10): message : Verwenden Sie ggf. "%zd" in der Formatzeichenfolge.
-C:\Users\krechter\git\CardNrServer\WebSocketServer.cpp(58,10): warning C4477: "printf": Die Formatzeichenfolge "%d" erfordert ein Argument vom Typ "int", das variadic-Argument "2" weist aber den Typ "size_t" auf.
-C:\Users\krechter\git\CardNrServer\WebSocketServer.cpp(58,10): message : Verwenden Sie ggf. "%zd" in der Formatzeichenfolge.
-C:\Users\krechter\git\CardNrServer\WebSocketServer.cpp(58,10): warning C4477: "printf": Die Formatzeichenfolge "%d" erfordert ein Argument vom Typ "int", das variadic-Argument "3" weist aber den Typ "size_t" auf.
-C:\Users\krechter\git\CardNrServer\WebSocketServer.cpp(58,10): message : Verwenden Sie ggf. "%zd" in der Formatzeichenfolge.
   WebSocketServer.vcxproj -> C:\Users\krechter\git\CardNrServer\x64\Debug\WebSocketServer.exe

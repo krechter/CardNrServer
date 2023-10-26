@@ -18,8 +18,8 @@ bool GetFirstReader(SCARDCONTEXT hSC, char* pszReturn, size_t size) {
 
   // Retrieve the list the readers.
   // hSC was set by a previous call to SCardEstablishContext.
-  //lReturn = SCardListReaders(hSC, NULL, (LPTSTR)&pmszReaders, &cch);
-	lReturn = SCardListReadersA(hSC, NULL, (LPSTR) & pmszReaders, &cch);
+  lReturn = SCardListReaders(hSC, NULL, (LPTSTR)&pmszReaders, &cch);
+	//lReturn = SCardListReadersA(hSC, NULL, (LPSTR) & pmszReaders, &cch);
   switch (lReturn) {
   case SCARD_E_NO_READERS_AVAILABLE:
     printf("No Reader available\n");
@@ -33,7 +33,9 @@ bool GetFirstReader(SCARDCONTEXT hSC, char* pszReturn, size_t size) {
       printf("Reader: %S\n", pReader);
       pReader = pReader + wcslen((wchar_t*)pReader) + 1;
     }
-    strncpy(pszReturn, (char*)pmszReaders, size);  // take first reader
+    
+		wcsncpy((LPTSTR)pszReturn, pmszReaders, size/2); // take first reader, size/2 wcsncpy copies 2 bytes per character
+		
 		SCardFreeMemory(hSC, pmszReaders);
     return true;
     break;
@@ -46,17 +48,19 @@ bool GetFirstReader(SCARDCONTEXT hSC, char* pszReturn, size_t size) {
   return false;
 }
 
-bool Connect(SCARDCONTEXT hSC, char* pszReader, LPSCARDHANDLE pCardHandle, char* pszReturn, size_t size) {
+bool Connect(SCARDCONTEXT hSC, char* pszReader, size_t lenReader, LPSCARDHANDLE pCardHandle, char* pszReturn, size_t size) {
 	DWORD dwAP;
 
-	//LONG lReturn = SCardConnect(hSC, (LPCWSTR)pszReader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, pCardHandle, &dwAP);
-	LONG lReturn = SCardConnectA(hSC, pszReader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, pCardHandle, &dwAP);
+	LONG lReturn = SCardConnect(hSC, (LPCWSTR)pszReader, SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, pCardHandle, &dwAP);
 	if (SCARD_S_SUCCESS != lReturn) {
 		printf("SCardConnect failed \n");
-		char test[] = "123";
-		char test2[255];
-		printf("sizof(test)=%d sizeof(test2)=%d sizeof(pszReturn)=%d\n", sizeof(test), sizeof(test2), sizeof(pszReturn));
-		strncpy(pszReturn, "SCardConnect failed", size);
+		
+		if (lReturn == SCARD_W_REMOVED_CARD) {
+			strncpy(pszReturn, "SCardConnect SCARD_W_REMOVED_CARD", size);
+		}
+		else {
+			strncpy(pszReturn, "SCardConnect failed", size);
+		}
 		return false;
 	}
 	switch (dwAP) {
@@ -167,18 +171,15 @@ bool GetCardNumber(char *pszReturn, size_t size) {// String must have space for 
 		return false;
   }
   else {
-    char pszReader[255];
-		if (GetFirstReader(hSC, pszReader, size)) {
+		const size_t lenReader = 255;
+		char pszReader[lenReader];
+		if (GetFirstReader(hSC, pszReader, lenReader-1)) {
 			SCARDHANDLE hCardHandle;
 
-			if (Connect(hSC, pszReader, &hCardHandle, pszReturn, size)) {
+			if (Connect(hSC, pszReader, lenReader-1, &hCardHandle, pszReturn, size)) {
 				if (AuthenticateBlock(hCardHandle, 0x28, pszReturn, size)) {
 					if (ReadBlock(hCardHandle, 0x28, pszReturn, size)) {
-						printf("Load key=");
-						for (int i = 0; i < 16; i++) {
-							printf("%02x ", pszReturn[i]);
-						}
-						printf("\n");
+					
 					}	else {
 						bError = true;
 					}
@@ -198,7 +199,7 @@ bool GetCardNumber(char *pszReturn, size_t size) {// String must have space for 
 
 
 // This RESTful server implements the following endpoints:
-//   /websocket - upgrade to Websocket, and implement websocket echo server
+//   /cardnr - upgrade to Websocket, and implement websocket echo server
 //   /rest - respond with JSON string {"result": 123}
 //   any other URI serves static files from s_web_root
 static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
@@ -229,7 +230,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
     if (GetCardNumber(cNumber, size) == true) {
       mg_ws_send(c, cNumber, strlen(cNumber), WEBSOCKET_OP_TEXT);
     } else {
-      char szText[] = "failed";
+      //char szText[] = "failed";
       printf("GetCardNumber failed\n");
       mg_ws_send(c, cNumber, strlen(cNumber), WEBSOCKET_OP_TEXT);
     }
