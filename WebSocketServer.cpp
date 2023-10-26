@@ -137,7 +137,7 @@ bool ReadBlock(SCARDHANDLE hCardHandle, char Block, char* pszReturn, size_t size
 	byte pbRecv[20];
 	memset(pbRecv, 0, sizeof(pbRecv));
 	DWORD dwRecv = sizeof(pbRecv);
-	byte pbSend[] = { 0xff, 0xb0, 0x00, 0x28, 0x10 };  // bytes following)
+	byte pbSend[] = { 0xff, 0xb0, 0x00, Block, 0x10 };  // bytes following)
 
 	LONG lReturn = SCardTransmit(hCardHandle, SCARD_PCI_T1, pbSend, sizeof(pbSend), NULL, pbRecv, &dwRecv);
 	if (SCARD_S_SUCCESS != lReturn) {
@@ -158,6 +158,35 @@ bool ReadBlock(SCARDHANDLE hCardHandle, char Block, char* pszReturn, size_t size
 	printf("%s\n", pszReturn);
 	return true;
 }
+
+
+bool WriteBlock(SCARDHANDLE hCardHandle, char Block, char* pszReturn, size_t size) {
+	// ffd6 00 28 10 +0x10 bytes  update block 0x28 length 0x10
+	byte pbRecv[20];
+	memset(pbRecv, 0, sizeof(pbRecv));
+	DWORD dwRecv = sizeof(pbRecv);
+	byte pbSend[] = { 0xff, 0xd6, 0x00, Block, 0x10, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30 };  // bytes following)
+	memcpy(pbSend + 5, pszReturn, 16);
+	LONG lReturn = SCardTransmit(hCardHandle, SCARD_PCI_T1, pbSend, sizeof(pbSend), NULL, pbRecv, &dwRecv);
+	if (SCARD_S_SUCCESS != lReturn) {
+		printf("SCardTransmit Write Block %02x failed\n", Block);
+		sprintf(pszReturn, "SCardTransmit Write Block %02x failed\n", Block);
+		return false;
+	}
+
+	printf("Written Block %02x=", Block);
+	for (int i = 0; i < 16; i++) {
+		printf("%02x ", pbSend[5 + i]);
+	}
+	printf("\n");
+	for (int i = 1; i < 7; i++) {
+		pszReturn[i - 1] = pbSend[5 + i];
+	}
+	pszReturn[6] = 0;
+	printf("%s\n", pszReturn);
+	return true;
+}
+
 
 bool GetCardNumber(char *pszReturn, size_t size) {// String must have space for 6 chars
   bool bError = false;
@@ -195,6 +224,51 @@ bool GetCardNumber(char *pszReturn, size_t size) {// String must have space for 
   }
   return bError == false;
 }
+
+
+bool WriteCardNumber(char* pszReturn, size_t size) {// String must have space for 6 chars
+	bool bError = false;
+	SCARDCONTEXT hSC;
+	LONG lReturn;
+	char cBuffer[16];
+	memset(cBuffer, 0x30, 16);
+	memcpy(cBuffer +1, pszReturn, 6);
+	// Establish the context.
+	lReturn = SCardEstablishContext(SCARD_SCOPE_USER, NULL, NULL, &hSC);
+	if (SCARD_S_SUCCESS != lReturn) {
+		printf("Failed SCardEstablishContext\n");
+		strncpy(pszReturn, "SCardEstablishContext failed", size);
+		return false;
+	}
+	else {
+		const size_t lenReader = 255;
+		char pszReader[lenReader];
+		if (GetFirstReader(hSC, pszReader, lenReader - 1)) {
+			SCARDHANDLE hCardHandle;
+
+			if (Connect(hSC, pszReader, lenReader - 1, &hCardHandle, pszReturn, size)) {
+				if (AuthenticateBlock(hCardHandle, 0x28, pszReturn, size)) {
+					if (WriteBlock(hCardHandle, 0x28, cBuffer, 16)) {
+
+					}
+					else {
+						bError = true;
+					}
+				}
+				else {
+					bError = true;
+				}
+				SCardDisconnect(hSC, SCARD_LEAVE_CARD);
+			}
+			else {
+				bError = true;
+			}
+		}
+		SCardReleaseContext(hSC);
+	}
+	return bError == false;
+}
+
 
 
 
@@ -238,15 +312,43 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
   (void) fn_data;
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
+	//printf("argc=%d\n", argc);
+	if (argc == 1) {
+		printf("ohne Parameter=listen, lese=KartenNr lesen, schreibe=KartenNr eingeben und schreiben\n");
+		struct mg_mgr mgr;  // Event manager
+		mg_mgr_init(&mgr);  // Initialise event manager
+		printf("Starting WS listener on %s/cardnr\n", s_listen_on);
+		mg_http_listen(&mgr, s_listen_on, fn, NULL);  // Create HTTP listener
+		for (;;) mg_mgr_poll(&mgr, 1000);             // Infinite event loop
+		mg_mgr_free(&mgr);
+	}
+	else {
+		if (argc == 2 && _stricmp(argv[1], "schreibe") == 0) {
+			char cInput[255];
+			printf("6-stellige Kartennummer eingeben:");
+			int iCount = scanf("%6s", cInput);
+			printf("\niCount=%d cInput='%6s'\n", iCount, cInput);
+			if (iCount == 1) {
+				WriteCardNumber(cInput, sizeof(cInput));
+			}
+			else {
+				printf("Die Eingabe muss aus 6 Zahlen bestehen");
+			}
+		}
+		else {
+			if (argc == 2 && _stricmp(argv[1], "lese") == 0) {
+				char cNumber[255];
+				size_t size = sizeof(cNumber) - 1;
 
-  //GetCardNumber();
-  //return 0;
-  struct mg_mgr mgr;  // Event manager
-  mg_mgr_init(&mgr);  // Initialise event manager
-  printf("Starting WS listener on %s/cardnr\n", s_listen_on);
-  mg_http_listen(&mgr, s_listen_on, fn, NULL);  // Create HTTP listener
-  for (;;) mg_mgr_poll(&mgr, 1000);             // Infinite event loop
-  mg_mgr_free(&mgr);
+				if (GetCardNumber(cNumber, size) == true) {
+					//printf("%6s\n", cNumber);
+				}
+				else {
+					printf("Fehler\n");
+				}
+			}
+		}
+	}
   return 0;
 }
