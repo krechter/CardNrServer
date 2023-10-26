@@ -1,1 +1,0 @@
-C:\Users\krechter\git\CardNrServer\x64\Debug\WebSocketServer.exe
